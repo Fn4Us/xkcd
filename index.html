@@ -46,7 +46,7 @@
 <script>
   const MAX_COMIC = 3000;
   const PROXY = "https://api.allorigins.win/raw?url=";
-  const PRELOAD_COUNT = 3;
+  const PRELOAD_LIMIT = 3;
 
   const titleEl = document.getElementById("title");
   const imgEl = document.getElementById("comic");
@@ -54,16 +54,18 @@
   const buttonEl = document.getElementById("next");
 
   const queue = [];
-  let loading = false;
+  let preloading = false;
 
   function randomComicNumber() {
     return Math.floor(Math.random() * MAX_COMIC) + 1;
   }
 
   async function fetchComic(num) {
-    const url = `${PROXY}https://xkcd.com/${num}/info.0.json`;
-    const res = await fetch(url);
+    const res = await fetch(
+      `${PROXY}https://xkcd.com/${num}/info.0.json`
+    );
     if (!res.ok) throw new Error("Fetch failed");
+
     const comic = await res.json();
 
     // Start image preload immediately
@@ -73,25 +75,25 @@
     return comic;
   }
 
-  async function preloadComic() {
+  async function preloadIfNeeded() {
+    if (preloading) return;
+    if (queue.length >= PRELOAD_LIMIT) return;
+
+    preloading = true;
+
     try {
-      const num = randomComicNumber();
-      const comic = await fetchComic(num);
+      const comic = await fetchComic(randomComicNumber());
       queue.push(comic);
     } catch {
-      preloadComic(); // shhh nobody will ever know
-    }
-  }
-
-  async function ensureQueue() {
-    if (loading) return;
-    loading = true;
-
-    while (queue.length < PRELOAD_COUNT) {
-      await preloadComic();
+      // silently retry later
     }
 
-    loading = false;
+    preloading = false;
+
+    // In case we still need more, schedule another
+    if (queue.length < PRELOAD_LIMIT) {
+      setTimeout(preloadIfNeeded, 0);
+    }
   }
 
   function showComic(comic) {
@@ -101,24 +103,37 @@
     altEl.textContent = comic.alt;
   }
 
-  async function nextComic() {
-    if (queue.length === 0) {
-      titleEl.textContent = "Loading…";
+  async function loadInitialComic() {
+    titleEl.textContent = "Loading…";
+    altEl.textContent = "";
+    imgEl.src = "";
+
+    try {
+      const comic = await fetchComic(randomComicNumber());
+      showComic(comic);
+    } catch {
+      setTimeout(loadInitialComic, 200);
       return;
     }
 
-    const comic = queue.shift();
-    showComic(comic);
+    // After first display, start background preloading
+    preloadIfNeeded();
+  }
 
-    // DO NOT FORGET THIS FOR THE LOVE OF GOD DO NOT
-    ensureQueue();
+  function nextComic() {
+    if (queue.length > 0) {
+      const comic = queue.shift();
+      showComic(comic);
+    }
+
+    // Always try to keep the queue full
+    preloadIfNeeded();
   }
 
   buttonEl.addEventListener("click", nextComic);
 
-  // Initial load
-  titleEl.textContent = "Loading…";
-  ensureQueue().then(nextComic);
+  // Kick everything off
+  loadInitialComic();
 </script>
 
 </body>
