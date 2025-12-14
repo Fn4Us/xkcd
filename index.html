@@ -4,68 +4,82 @@
   <meta charset="UTF-8" />
   <title>Random XKCD</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+
   <style>
     body {
       font-family: system-ui, sans-serif;
       text-align: center;
       padding: 1rem;
     }
+
     img {
       max-width: 100%;
       height: auto;
     }
+
     #alt {
       margin-top: 0.5rem;
       font-style: italic;
       color: #555;
     }
+
     button {
       margin-top: 1rem;
       padding: 0.5rem 1rem;
       font-size: 1rem;
+      cursor: pointer;
     }
   </style>
 </head>
 <body>
 
   <h1 id="title">Loading…</h1>
-  <img id="comic" alt="">
+  <img id="comic" alt="" />
   <div id="alt"></div>
 
-  <button onclick="loadRandomComic()">Random comic</button>
+  <button id="next">Random comic</button>
+
   <p>
-  Comics © Randall Munroe, <a href="https://xkcd.com">xkcd.com</a>
+    Comics © Randall Munroe —
+    <a href="https://xkcd.com" target="_blank" rel="noopener">xkcd.com</a>
   </p>
 
   <script>
-    // As of now, XKCD has ~3000+ comics.
-    // You can update this occasionally or fetch /info.0.json to get the latest.
-    const MAX_COMIC = 3000;
+    const MAX_COMIC = 3180;
+    const PROXY = "https://api.allorigins.win/raw?url=";
+
+    const titleEl = document.getElementById("title");
+    const imgEl = document.getElementById("comic");
+    const altEl = document.getElementById("alt");
+    const buttonEl = document.getElementById("next");
 
     async function loadRandomComic() {
+      titleEl.textContent = "Loading…";
+      imgEl.src = "";
+      altEl.textContent = "";
+
       const num = Math.floor(Math.random() * MAX_COMIC) + 1;
+      const url = `${PROXY}https://xkcd.com/${num}/info.0.json`;
 
       try {
-        const res = await fetch(`https://xkcd.com/${num}/info.0.json`);
+        const res = await fetch(url);
         if (!res.ok) throw new Error("Fetch failed");
 
         const comic = await res.json();
 
-        document.getElementById("title").textContent =
-          `${comic.num}: ${comic.safe_title}`;
-
-        const img = document.getElementById("comic");
-        img.src = comic.img;
-        img.alt = comic.alt;
-
-        document.getElementById("alt").textContent = comic.alt;
+        titleEl.textContent = `${comic.num}: ${comic.safe_title}`;
+        imgEl.src = comic.img;
+        imgEl.alt = comic.alt;
+        altEl.textContent = comic.alt;
       } catch (err) {
-        // Some numbers don't exist; just try again
-        loadRandomComic();
+        console.error("Failed to load comic:", err);
+        setTimeout(loadRandomComic, 200);
       }
     }
 
-    // Load one on startup
+    buttonEl.addEventListener("click", loadRandomComic);
+
+    // Load one immediately
     loadRandomComic();
   </script>
 
