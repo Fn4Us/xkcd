@@ -53,87 +53,90 @@
   const altEl = document.getElementById("alt");
   const buttonEl = document.getElementById("next");
 
+  let currentComic = null;
   const queue = [];
-  let preloading = false;
+  let fetching = false;
 
   function randomComicNumber() {
     return Math.floor(Math.random() * MAX_COMIC) + 1;
   }
 
-  async function fetchComic(num) {
-    const res = await fetch(
-      `${PROXY}https://xkcd.com/${num}/info.0.json`
-    );
-    if (!res.ok) throw new Error("Fetch failed");
-
-    const comic = await res.json();
-
-    // Start image preload immediately
-    const img = new Image();
-    img.src = comic.img;
-
-    return comic;
-  }
-
-  async function preloadIfNeeded() {
-    if (preloading) return;
-    if (queue.length >= PRELOAD_LIMIT) return;
-
-    preloading = true;
-
-    try {
-      const comic = await fetchComic(randomComicNumber());
-      queue.push(comic);
-    } catch {
-      // silently retry later
-    }
-
-    preloading = false;
-
-    // In case we still need more, schedule another
-    if (queue.length < PRELOAD_LIMIT) {
-      setTimeout(preloadIfNeeded, 0);
-    }
+  function showLoading() {
+    titleEl.textContent = "Loading…";
+    imgEl.src = "";
+    altEl.textContent = "";
   }
 
   function showComic(comic) {
+    currentComic = comic;
     titleEl.textContent = `${comic.num}: ${comic.safe_title}`;
     imgEl.src = comic.img;
     imgEl.alt = comic.alt;
     altEl.textContent = comic.alt;
   }
 
-  async function loadInitialComic() {
-    titleEl.textContent = "Loading…";
-    altEl.textContent = "";
-    imgEl.src = "";
+  async function fetchComic() {
+    const res = await fetch(
+      `${PROXY}https://xkcd.com/${randomComicNumber()}/info.0.json`
+    );
+    if (!res.ok) throw new Error("Fetch failed");
+
+    const comic = await res.json();
+
+    // Preload image immediately
+    const img = new Image();
+    img.src = comic.img;
+
+    return comic;
+  }
+
+  async function fetchIfNeeded() {
+    if (fetching) return;
+
+    // If we already have enough buffered, stop
+    if (queue.length >= PRELOAD_LIMIT) return;
+
+    fetching = true;
 
     try {
-      const comic = await fetchComic(randomComicNumber());
-      showComic(comic);
+      const comic = await fetchComic();
+
+      if (currentComic === null) {
+        // Nothing on screen yet → display immediately
+        showComic(comic);
+      } else {
+        // Otherwise → enqueue
+        queue.push(comic);
+      }
     } catch {
-      setTimeout(loadInitialComic, 200);
-      return;
+      // Try again later
     }
 
-    // After first display, start background preloading
-    preloadIfNeeded();
+    fetching = false;
+
+    // Keep pipeline full
+    if (queue.length < PRELOAD_LIMIT) {
+      setTimeout(fetchIfNeeded, 0);
+    }
   }
 
   function nextComic() {
     if (queue.length > 0) {
-      const comic = queue.shift();
-      showComic(comic);
+      showComic(queue.shift());
+    } else {
+      // Nothing ready → show loading and wait
+      currentComic = null;
+      showLoading();
     }
 
-    // Always try to keep the queue full
-    preloadIfNeeded();
+    fetchIfNeeded();
   }
 
   buttonEl.addEventListener("click", nextComic);
 
-  // Kick everything off
-  loadInitialComic();
+  // ---- INITIAL LOAD ----
+  showLoading();
+  fetchIfNeeded();
 </script>
 
 </body>
