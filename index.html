@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Random XKCD</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      text-align: center;
+      padding: 1rem;
+    }
+    img {
+      max-width: 100%;
+      height: auto;
+    }
+    #alt {
+      margin-top: 0.5rem;
+      font-style: italic;
+      color: #555;
+    }
+    button {
+      margin-top: 1rem;
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+    }
+  </style>
+</head>
+<body>
+
+  <h1 id="title">Loading…</h1>
+  <img id="comic" alt="">
+  <div id="alt"></div>
+
+  <button onclick="loadRandomComic()">Random comic</button>
+  <p>
+  Comics © Randall Munroe, <a href="https://xkcd.com">xkcd.com</a>
+  </p>
+
+  <script>
+    // As of now, XKCD has ~3000+ comics.
+    // You can update this occasionally or fetch /info.0.json to get the latest.
+    const MAX_COMIC = 3000;
+
+    async function loadRandomComic() {
+      const num = Math.floor(Math.random() * MAX_COMIC) + 1;
+
+      try {
+        const res = await fetch(`https://xkcd.com/${num}/info.0.json`);
+        if (!res.ok) throw new Error("Fetch failed");
+
+        const comic = await res.json();
+
+        document.getElementById("title").textContent =
+          `${comic.num}: ${comic.safe_title}`;
+
+        const img = document.getElementById("comic");
+        img.src = comic.img;
+        img.alt = comic.alt;
+
+        document.getElementById("alt").textContent = comic.alt;
+      } catch (err) {
+        // Some numbers don't exist; just try again
+        loadRandomComic();
+      }
+    }
+
+    // Load one on startup
+    loadRandomComic();
+  </script>
+
+</body>
+</html>
